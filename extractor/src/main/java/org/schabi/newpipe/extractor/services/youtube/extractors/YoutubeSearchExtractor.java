@@ -202,6 +202,33 @@ public class YoutubeSearchExtractor extends YoutubeBaseSearchExtractor {
                     collector.commit(
                             new YoutubeMixOrPlaylistLockupInfoItemExtractor(lockupViewModel));
                 }
+            } else if (item.has("reelShelfRenderer")) {
+                // Shorts shelf section: without this branch every short YouTube groups into a
+                // shelf is silently dropped and search returns almost no shorts at all.
+                for (final Object reel : item.getObject("reelShelfRenderer").getArray("items")) {
+                    final JsonObject reelItem = (JsonObject) reel;
+                    if (reelItem.has("reelItemRenderer")) {
+                        collector.commit(new YoutubeStreamInfoItemExtractor(
+                                reelItem.getObject("reelItemRenderer"), timeAgoParser));
+                    } else if (reelItem.has("shortsLockupViewModel")) {
+                        collector.commit(new YoutubeShortsInfoItemExtractor(
+                                reelItem.getObject("shortsLockupViewModel")));
+                    }
+                }
+            } else if (item.has("gridShelfViewModel")) {
+                // Current desktop SERP wraps the shorts shelf this way (verified live 2026-08:
+                // gridShelfViewModel.contents[].shortsLockupViewModel).
+                for (final Object grid : item.getObject("gridShelfViewModel")
+                        .getArray("contents")) {
+                    final JsonObject gridItem = (JsonObject) grid;
+                    if (gridItem.has("shortsLockupViewModel")) {
+                        collector.commit(new YoutubeShortsInfoItemExtractor(
+                                gridItem.getObject("shortsLockupViewModel")));
+                    }
+                }
+            } else if (item.has("shortsLockupViewModel")) {
+                collector.commit(new YoutubeShortsInfoItemExtractor(
+                        item.getObject("shortsLockupViewModel")));
             }
         }
     }
