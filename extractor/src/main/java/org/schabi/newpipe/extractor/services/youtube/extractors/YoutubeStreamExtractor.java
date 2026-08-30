@@ -1963,6 +1963,36 @@ public class YoutubeStreamExtractor extends StreamExtractor {
                     .getArray("results");
 
             final TimeAgoParser timeAgoParser = getTimeAgoParser();
+
+            // Shorts shelf in the watch-next sidebar: a single "results" entry that fans out
+            // to many stream items, so it can't fit the single-item map() below. Handled
+            // separately and committed directly, same extractors as the search shelf patch.
+            for (final Object result : results) {
+                if (!(result instanceof JsonObject)) {
+                    continue;
+                }
+                final JsonObject resultObj = (JsonObject) result;
+                if (resultObj.has("reelShelfRenderer")) {
+                    for (final Object reel : resultObj.getObject("reelShelfRenderer")
+                            .getArray("items")) {
+                        if (!(reel instanceof JsonObject)) {
+                            continue;
+                        }
+                        final JsonObject reelItem = (JsonObject) reel;
+                        if (reelItem.has("reelItemRenderer")) {
+                            collector.commit(new YoutubeStreamInfoItemExtractor(
+                                    reelItem.getObject("reelItemRenderer"), timeAgoParser));
+                        } else if (reelItem.has("shortsLockupViewModel")) {
+                            collector.commit(new YoutubeShortsInfoItemExtractor(
+                                    reelItem.getObject("shortsLockupViewModel")));
+                        }
+                    }
+                } else if (resultObj.has("shortsLockupViewModel")) {
+                    collector.commit(new YoutubeShortsInfoItemExtractor(
+                            resultObj.getObject("shortsLockupViewModel")));
+                }
+            }
+
             results.stream()
                     .filter(JsonObject.class::isInstance)
                     .map(JsonObject.class::cast)
