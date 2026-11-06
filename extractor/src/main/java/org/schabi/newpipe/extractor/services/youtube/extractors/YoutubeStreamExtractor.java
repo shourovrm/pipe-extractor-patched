@@ -889,8 +889,9 @@ public class YoutubeStreamExtractor extends StreamExtractor {
                     && streamType != StreamType.POST_LIVE_STREAM
                     && hasSabrStreamingUrl()) {
                 buildSabrStreams(videoId);
-            } else if (!(isTvClient(selectedClient)
-                    && streamType == StreamType.LIVE_STREAM)) {
+            } else if (streamType != StreamType.LIVE_STREAM) {
+                // A live stream's direct URLs are live chunks, not files; players must use its HLS
+                // manifest, so none are offered on any client (upstream skipped them for TV only).
                 extractDirectFormats(videoId);
             }
             if (streamType == StreamType.POST_LIVE_STREAM
