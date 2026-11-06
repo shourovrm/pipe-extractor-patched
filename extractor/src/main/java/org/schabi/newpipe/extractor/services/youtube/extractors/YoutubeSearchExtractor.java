@@ -199,6 +199,20 @@ public class YoutubeSearchExtractor extends YoutubeBaseSearchExtractor {
             } else if (item.has("shortsLockupViewModel")) {
                 collector.commit(new YoutubeShortsInfoItemExtractor(
                         item.getObject("shortsLockupViewModel")));
+            } else if (item.has("reelShelfRenderer")) {
+                // Shorts shelf section (older SERP shape): without this branch every short
+                // YouTube groups into a reel shelf is silently dropped. Upstream 5.5.0 already
+                // walks gridShelfViewModel and bare shortsLockupViewModel below.
+                for (final Object reel : item.getObject("reelShelfRenderer").getArray("items")) {
+                    final JsonObject reelItem = (JsonObject) reel;
+                    if (reelItem.has("reelItemRenderer")) {
+                        collector.commit(new YoutubeStreamInfoItemExtractor(
+                                reelItem.getObject("reelItemRenderer"), timeAgoParser));
+                    } else if (reelItem.has("shortsLockupViewModel")) {
+                        collector.commit(new YoutubeShortsInfoItemExtractor(
+                                reelItem.getObject("shortsLockupViewModel")));
+                    }
+                }
             } else if (item.has("gridShelfViewModel")) {
                 final JsonArray shelfContents = item.getObject("gridShelfViewModel")
                         .getArray("contents");
