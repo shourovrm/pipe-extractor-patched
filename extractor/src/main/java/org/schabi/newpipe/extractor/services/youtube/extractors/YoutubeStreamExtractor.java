@@ -936,13 +936,17 @@ public class YoutubeStreamExtractor extends StreamExtractor {
             return;
         }
 
-        cachedAudioStreams = new ArrayList<>();
-        cachedVideoStreams = new ArrayList<>();
-        cachedVideoOnlyStreams = new ArrayList<>();
+        clearCachedStreams();
         try {
-            extractWebEmbeddedFormats(videoId);
+            if (!extractWebEmbeddedFormats(videoId)) {
+                // The embedded player sometimes answers with the muxed 360p only; a fresh page
+                // usually brings the full list. An owner who disabled embedding throws above instead.
+                clearCachedStreams();
+                extractWebEmbeddedFormats(videoId);
+            }
         } catch (final Exception ignored) {
             // Fallback errors do not replace or decorate the primary player error.
+            clearCachedStreams();
         }
         if (cachedVideoStreams.isEmpty() && cachedVideoOnlyStreams.isEmpty()) {
             try {
@@ -957,14 +961,22 @@ public class YoutubeStreamExtractor extends StreamExtractor {
         streamsCached = true;
     }
 
+    private void clearCachedStreams() {
+        cachedAudioStreams = new ArrayList<>();
+        cachedVideoStreams = new ArrayList<>();
+        cachedVideoOnlyStreams = new ArrayList<>();
+    }
+
     /**
      * Fetches the formats the embedded player (Innertube client WEB_EMBEDDED_PLAYER) serves, the
      * way yt-dlp's {@code web_embedded} client does. YouTube only answers when the player request
      * echoes the {@code encryptedHostFlags} and visitor data of an embed page fetched with the
      * embedding page as Referer, and names that same page as {@code thirdParty.embedUrl}. The page
      * can be any non-YouTube URL.
+     *
+     * @return whether the answer carried adaptive video formats, not just the muxed 360p
      */
-    private void extractWebEmbeddedFormats(@Nonnull final String videoId)
+    private boolean extractWebEmbeddedFormats(@Nonnull final String videoId)
             throws IOException, ExtractionException {
         final Localization localization = getExtractorLocalization();
         final ContentCountry contentCountry = getExtractorContentCountry();
@@ -1035,6 +1047,7 @@ public class YoutubeStreamExtractor extends StreamExtractor {
             playerCaptionsTracklistRenderer = response.getObject("captions")
                     .getObject("playerCaptionsTracklistRenderer");
         }
+        return !cachedVideoOnlyStreams.isEmpty();
     }
 
     @Nonnull
