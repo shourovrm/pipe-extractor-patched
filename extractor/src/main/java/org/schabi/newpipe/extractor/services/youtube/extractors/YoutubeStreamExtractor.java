@@ -948,17 +948,22 @@ public class YoutubeStreamExtractor extends StreamExtractor {
             // Fallback errors do not replace or decorate the primary player error.
             clearCachedStreams();
         }
-        if (cachedVideoStreams.isEmpty() && cachedVideoOnlyStreams.isEmpty()) {
+        if (!hasFallbackStreams()) {
             try {
                 extractAndroidReelMuxedFormats(videoId);
             } catch (final Exception ignored) {
                 // Reel errors do not replace or decorate the primary player error.
             }
         }
-        if (cachedVideoStreams.isEmpty() && cachedVideoOnlyStreams.isEmpty()) {
+        if (!hasFallbackStreams()) {
             throw primaryPlayerError;
         }
         streamsCached = true;
+    }
+
+    private boolean hasFallbackStreams() {
+        return !cachedVideoStreams.isEmpty() || !cachedVideoOnlyStreams.isEmpty()
+                || !getHlsManifestUrlFromStreamingData().isEmpty();
     }
 
     private void clearCachedStreams() {
@@ -1038,6 +1043,13 @@ public class YoutubeStreamExtractor extends StreamExtractor {
         final JsonObject streamingData = response.getObject(STREAMING_DATA);
         if (isNullOrEmpty(streamingData)) {
             throw new ExtractionException("Embedded player response has no streaming data");
+        }
+        if (response.getObject("videoDetails").getBoolean("isLive", false)) {
+            // A live stream plays from the HLS manifest; its direct URLs are live chunks, not files.
+            configuredStreamingData = streamingData;
+            streamType = StreamType.LIVE_STREAM;
+            watchDataCache.streamType = streamType;
+            return true;
         }
         extractDirectFormatsFromArray(videoId, streamingData.getArray("formats"), cpn,
                 EnumSet.of(ItagItem.ItagType.VIDEO));
